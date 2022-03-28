@@ -1,43 +1,91 @@
-const XHR = new XMLHttpRequest();
+const root = document.getElementById("root");
 
-const newsURL = "https://api.hnpwa.com/v0/news/1.json";
-const contentURL = "https://api.hnpwa.com/v0/item/:id.json";
+let currPage = 1;
 
-XHR.open("GET", newsURL, false);
+//Ajax 호출 함수
+const Ajax = (URL) => {
+  const XHR = new XMLHttpRequest();
 
-XHR.send();
-
-const newsFeed = JSON.parse(XHR.response);
-
-console.log(newsFeed);
-
-window.addEventListener("hashchange", () => {
-  const id = location.hash.slice(1);
-
-  XHR.open("GET", contentURL.replace(/:id/g, id), false);
+  XHR.open("GET", URL, false);
   XHR.send();
 
-  const newsContent = JSON.parse(XHR.response);
+  const data = JSON.parse(XHR.response);
 
-  console.log(newsContent);
+  return data;
+};
 
-  if (newsContent) {
-    root.innerHTML += `
-      <div>${newsContent.title}</div>
-    `;
-  }
-});
+// 뉴스 리스트 보여주는 함수
+const newsLists = () => {
+  const newsURL = `https://api.hnpwa.com/v0/news/${currPage}.json`;
 
-for (let i = 0; i < 10; i++) {
-  const root = document.getElementById("root");
+  const newsFeed = Ajax(newsURL);
+  let template = `
+  <div>
+    <h1>Hacker News</h1>
+    <ul>
+      {{__news_feed__}}
+    </ul>
+    <div>
+      <a href="#/page/{{__prev_page__}}">이전페이지</a>
+      <a href="#/page/{{__next_page__}}">다음페이지</a>
+    </div>
+  </div>
+  `;
 
-  root.innerHTML += `
-  <ul>
+  const newsList = [];
+  for (let i = 0; i < 30; i++) {
+    newsList.push(`
     <li>
-      <a href="#${newsFeed[i].id}">
+      <a href="#/show/${newsFeed[i].id}">
         ${newsFeed[i].title} (${newsFeed[i].comments_count})
       </a>
     </li>
-  </ul>
-  `;
-}
+  `);
+  }
+
+  template = template.replace("{{__news_feed__}}", newsList.join(""));
+  template = template.replace(
+    "{{__prev_page__}}",
+    currPage > 1 ? currPage - 1 : 1
+  );
+  template = template.replace(
+    "{{__next_page__}}",
+    currPage === 10 ? 10 : currPage + 1
+  );
+
+  root.innerHTML = template;
+};
+
+// 뉴스 내용 보여주는 함수
+const newsDetail = () => {
+  root.innerHTML = "";
+  const id = location.hash.slice(7);
+
+  const contentURL = `https://api.hnpwa.com/v0/item/${id}.json`;
+  const newsContent = Ajax(contentURL);
+
+  if (newsContent) {
+    root.innerHTML += `
+      <h1>${newsContent.title}</h1>
+
+      <div>
+        <a href="#">목록으로</a>
+      </div>
+    `;
+  }
+};
+
+const router = () => {
+  const routePath = location.hash;
+
+  if (routePath === "") {
+    newsLists();
+  } else if (routePath.indexOf("#/show/") >= 0) {
+    newsDetail();
+  } else {
+    currPage = Number(routePath.slice(7));
+    newsLists();
+  }
+};
+
+window.addEventListener("hashchange", router);
